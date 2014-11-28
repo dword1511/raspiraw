@@ -1,4 +1,6 @@
 
+LIBSUFFIX:=$(shell uname -m | cut -c 5-)
+
 all: raspi_dng
 
 tiff-3.8.2.tar.gz:
@@ -11,7 +13,7 @@ tiff-3.8.2: tiff-3.8.2.tar.gz libtiff.patch
 libtiff.patch:
 	wget -nc 'http://www.cybercom.net/~dcoffin/dcraw/libtiff.patch'
 
-local/lib/libtiff.a: tiff-3.8.2
+local/lib$(LIBSUFFIX)/libtiff.a: tiff-3.8.2
 	cd $< ; ./configure --prefix=$(PWD)/local
 	cd $< ; make -j4
 	cd $< ; make install
@@ -19,8 +21,8 @@ local/lib/libtiff.a: tiff-3.8.2
 clean:
 	rm -rf local tiff-3.8.2 *.o
 
-raspi_dng.o: local/lib/libtiff.a raspi_dng.c
+raspi_dng.o: local/lib$(LIBSUFFIX)/libtiff.a raspi_dng.c
 	$(CC) -c raspi_dng.c -I./local/include -o $@
 
-raspi_dng: raspi_dng.o local/lib/libtiff.a
-	$(CC) raspi_dng.o local/lib/libtiff.a -ljpeg -lm -lz -o $@
+raspi_dng: raspi_dng.o local/lib$(LIBSUFFIX)/libtiff.a
+	$(CC) raspi_dng.o local/lib$(LIBSUFFIX)/libtiff.a -ljpeg -lm -lz -o $@
