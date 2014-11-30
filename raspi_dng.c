@@ -36,7 +36,8 @@
 #define IDSIZE 4    // number of bytes in raw header ID string
 #define HPIXELS 2592   // number of horizontal pixels on OV5647 sensor
 #define VPIXELS 1944   // number of vertical pixels on OV5647 sensor
-
+#define CFA_PATTERN "\001\002\0\001"  // GBRG: 0 = Red, 1 = Green, 2 = Blue
+                                      // old: BGGR
 int main (int argc, char **argv)
 {
 	static const short CFARepeatPatternDim[] = { 2,2 };
@@ -144,7 +145,7 @@ int main (int argc, char **argv)
 	TIFFSetField (tif, TIFFTAG_SAMPLESPERPIXEL, 1);
 	TIFFSetField (tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
 	TIFFSetField (tif, TIFFTAG_CFAREPEATPATTERNDIM, CFARepeatPatternDim);
-	TIFFSetField (tif, TIFFTAG_CFAPATTERN, 4, "\002\001\001\0"); // 0 = Red, 1 = Green, 2 = Blue, 3 = Cyan, 4 = Magenta, 5 = Yellow, 6 = White 
+	TIFFSetField (tif, TIFFTAG_CFAPATTERN, 4, CFA_PATTERN);
 	//TIFFSetField (tif, TIFFTAG_LINEARIZATIONTABLE, 256, curve);
 	TIFFSetField (tif, TIFFTAG_WHITELEVEL, 1, &white);
 
