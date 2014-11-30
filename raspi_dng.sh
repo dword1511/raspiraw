@@ -25,3 +25,7 @@ else
   # assume it is in the path
   raspi_dng "$infile" "$outfile" "$matrix"
 fi
+
+# copy exif-information, reset date/time information
+exiftool -overwrite_original -tagsFromFile "$infile" "$outfile"
+touch -r "$infile" "$outfile"
