@@ -38,11 +38,14 @@
 #define VPIXELS 1944   // number of vertical pixels on OV5647 sensor
 #define CFA_PATTERN "\001\002\0\001"  // GBRG: 0 = Red, 1 = Green, 2 = Blue
                                       // old: BGGR
+
+void readMatrix(float[9],const char*);
+
 int main (int argc, char **argv)
 {
 	static const short CFARepeatPatternDim[] = { 2,2 };
 	// default color matrix from dcraw
-	static const float cam_xyz[] = {
+	float cam_xyz[] = {
 	     //  R        G        B
 		1.2782,	-0.4059, -0.0379, // R
 	       -0.0478,	 0.9066,  0.1413, // G
@@ -66,16 +69,24 @@ int main (int argc, char **argv)
 	unsigned short pixel[HPIXELS];  // array holds 16 bits per pixel
 	unsigned char split;        // single byte with 4 pairs of low-order bits
 
-	if (argc != 3) {
-		fprintf (stderr, "Usage: %s infile outfile\n"
-			"Example: %s rpi.jpg output.dng\n", argv[0], argv[0]);
+	if (argc < 3 || argc > 4) {
+		fprintf (stderr, "Usage: %s infile outfile [color-matrix]\n"
+			"Example: %s rpi.jpg output.dng " 
+                         "\"8032,-3478,-274,-1222,5560,-240,100,-2714,6716\"\n", argv[0], argv[0]);
 		return 1;
 	}
 
+	// check if input-file exists
 	if (!(ifp = fopen (fname, "rb"))) {
-		perror (argv[2]);
+		perror (argv[1]);
 		return 1;
 	}
+
+	// read color-matrix if passed as third argument
+	if (argc == 4) {
+	  readMatrix(cam_xyz,argv[3]);
+	}
+
 	stat (fname, &st);
 	gmtime_r (&st.st_mtime, &tm);
 	sprintf (datetime, "%04d:%02d:%02d %02d:%02d:%02d",
@@ -188,4 +199,23 @@ int main (int argc, char **argv)
 fail:
 	fclose (ifp);
 	return status;
+}
+
+// parse color-matrix from command-line
+
+void readMatrix(float* matrix,const char* arg) {
+  sscanf(arg,"%f, %f, %f, "
+             "%f, %f, %f, "
+             "%f, %f, %f, ",
+        &matrix[0], &matrix[1], &matrix[2], 
+        &matrix[3], &matrix[4], &matrix[5], 
+        &matrix[6], &matrix[7], &matrix[8]);
+
+  // scale result if input is not normalized
+  if (matrix[0] > 10) {
+    int i;
+    for (i=0; i<9; ++i) {
+      matrix[i] /= 10000;
+    }
+  }
 }
