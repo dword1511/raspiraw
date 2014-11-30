@@ -14,6 +14,10 @@ need to process old images, use the original version of raspi_dng.
 N.B.: old images are easily identified: the EXIF-tag 'model' is 'ov5647' for
 old images and 'RP_OV5647' for new images.
 
+The makefile now supports compilation on 64bit Linux systems. This might
+break compilation on a Raspberry Pi, I will check (and correct if necessary)
+as soon as possible.
+
 Prerequisites
 =============
 
