@@ -22,7 +22,7 @@ clean:
 	rm -rf local tiff-3.8.2 *.o
 
 raspi_dng.o: local/lib$(LIBSUFFIX)/libtiff.a raspi_dng.c
-	$(CC) -c raspi_dng.c -I./local/include -o $@
+	$(CC) $(CCFLAGS) -c raspi_dng.c -I./local/include -o $@
 
 raspi_dng: raspi_dng.o local/lib$(LIBSUFFIX)/libtiff.a
 	$(CC) raspi_dng.o local/lib$(LIBSUFFIX)/libtiff.a -ljpeg -lm -lz -o $@
