@@ -21,6 +21,7 @@
 *.gz
 *.jpg
 *.dng
+*.tif*
 
 # Local configuration
 .project
@@ -30,3 +31,4 @@ local
 tiff-*
 raspi_dng
 raspiraw
+
