@@ -41,12 +41,12 @@
 int main (int argc, char **argv)
 {
 	static const short CFARepeatPatternDim[] = { 2,2 };
-	// this color matrix is definitely inaccurate, TODO: calibrate
+	// default color matrix from dcraw
 	static const float cam_xyz[] = {
-		// R 	G     	B
-		1.000,	0.000,	0.000,	// R
-		0.000,	1.000,	0.000,	// G
-		0.000,	0.000,	1.000	// B
+	     //  R        G        B
+		1.2782,	-0.4059, -0.0379, // R
+	       -0.0478,	 0.9066,  0.1413, // G
+		0.1340,	 0.1513,  0.5176  // B
 	};
 	static const float neutral[] = { 1.0, 1.0, 1.0 }; // TODO calibrate
 	long sub_offset=0, white=0xffff;
