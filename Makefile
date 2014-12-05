@@ -1,5 +1,9 @@
-
-LIBSUFFIX:=$(shell uname -m | cut -c 5-)
+ARCH=$(shell uname -m)
+ifeq ($(ARCH),x86_64)
+  LIBSUFFIX=64
+else
+  LIBSUFFIX=
+endif
 
 all: raspi_dng
 
