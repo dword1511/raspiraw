@@ -1,5 +1,9 @@
-
-LIBSUFFIX:=$(shell uname -m | cut -c 5-)
+ARCH=$(shell uname -m)
+ifeq ($(ARCH),x86_64)
+  LIBSUFFIX=64
+else
+  LIBSUFFIX=
+endif
 
 all: raspi_dng
 
@@ -25,4 +29,5 @@ raspi_dng.o: local/lib$(LIBSUFFIX)/libtiff.a raspi_dng.c
 	$(CC) $(CCFLAGS) -c raspi_dng.c -I./local/include -o $@
 
 raspi_dng: raspi_dng.o local/lib$(LIBSUFFIX)/libtiff.a
-	$(CC) raspi_dng.o local/lib$(LIBSUFFIX)/libtiff.a -ljpeg -lm -lz -o $@
+	$(CC) raspi_dng.o local/lib$(LIBSUFFIX)/libtiff.a \
+			-ljpeg -lm -lz -lexif -o $@
