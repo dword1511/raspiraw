@@ -9,12 +9,7 @@
 
    Free for all uses.
 
-
    Requires LibTIFF 3.8.0 plus a patch, see http://www.cybercom.net/~dcoffin/dcraw/
-
-   Compile with:
-   gcc -o raspi_dng raspi_dng.c -O4 -Wall -lm -ljpeg -ltiff
-   
  */
 
 
@@ -27,6 +22,7 @@
 #include <math.h>
 #include <tiffio.h>
 #include <errno.h>
+#include <libexif/exif-data.h>
 
 
 #define LINELEN 256            // how long a string we need to hold the filename
@@ -40,6 +36,7 @@
                                       // old: BGGR
 
 void readMatrix(float[9],const char*);
+void getMatrx(char*, char*);
 void readGains(float[3], const char*);
 
 int main (int argc, char **argv)
@@ -88,6 +85,12 @@ int main (int argc, char **argv)
 	// read color-matrix if passed as third argument
 	if (argc >= 4) {
 	  readMatrix(cam_xyz,argv[3]);
+	} else {
+	  char matrix[128];
+	  getMatrix(fname,matrix);
+	  if (strlen(matrix)) {
+	    readMatrix(cam_xyz,matrix);
+	  }
 	}
 
 	// read gain-values if passed as fourth argument
@@ -226,6 +229,21 @@ void readMatrix(float* matrix,const char* arg) {
       matrix[i] /= 10000;
     }
   }
+}
+
+// read color-matrix from EXIF-data   ----------------------------------------
+
+void getMatrix(char* filename, char* matrix) {
+  ExifData* edata = exif_data_new_from_file(filename);
+  if (!edata) {
+    matrix[0] = '\0';
+    return;
+  }
+  ExifEntry* eentry = exif_content_get_entry(edata->ifd[EXIF_IFD_EXIF],0x927c);
+
+  sscanf(strstr(eentry->data,"ccm=")+4,"%s ",matrix);
+  exif_data_unref(edata);
+  return;
 }
 
 // parse gain-values from the command-line   ---------------------------------
