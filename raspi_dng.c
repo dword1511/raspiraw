@@ -32,16 +32,18 @@
 #define IDSIZE 4    // number of bytes in raw header ID string
 #define HPIXELS 2592   // number of horizontal pixels on OV5647 sensor
 #define VPIXELS 1944   // number of vertical pixels on OV5647 sensor
-#define CFA_PATTERN "\001\002\0\001"  // GBRG: 0 = Red, 1 = Green, 2 = Blue
-                                      // old: BGGR
 
 void readMatrix(float[9],const char*);
-void readExifMatrix(const char*, char*);
-void readGains(float[3], const char*);
 
 int main (int argc, char **argv)
 {
 	static const short CFARepeatPatternDim[] = { 2,2 };
+
+	// Bayer patterns (0 = Red, 1 = Green, 2 = Blue)
+	static char* CFA_PATTERN_N  = "\001\002\0\001";  // GBRG
+	static char* CFA_PATTERN_HF = "\002\001\001\0";  // BGGR
+	char* cfaPattern;
+
 	// default color matrix from dcraw
 	float cam_xyz[] = {
 	     //  R        G        B
@@ -81,17 +83,33 @@ int main (int argc, char **argv)
 		return 1;
 	}
 
-	// read color-matrix if passed as third argument
-	if (argc >= 4) {
-	  readMatrix(cam_xyz,argv[3]);
-	} else {
-	  char matrix[128];
-	  readExifMatrix(fname,matrix);
-	  if (strlen(matrix)) {
-	    readMatrix(cam_xyz,matrix);
+	// process EXIF-data
+	ExifData* edata = exif_data_new_from_file(fname);
+	ExifEntry* eentry = NULL;
+	if (edata) {
+	  eentry = exif_content_get_entry(edata->ifd[EXIF_IFD_0],EXIF_TAG_MODEL);
+	  if (!strncmp(eentry->data,"ov5647",6)) {
+	    // old version uses current horizontal-flip readout
+	    cfaPattern = CFA_PATTERN_HF;
+	  } else {
+	    // assume normal readout
+	    cfaPattern = CFA_PATTERN_N;
 	  }
 	}
 
+	// read color-matrix if passed as third argument
+	if (argc >= 4) {
+	  readMatrix(cam_xyz,argv[3]);
+	} else if (edata) {
+	  eentry = exif_content_get_entry(edata->ifd[EXIF_IFD_EXIF],0x927c);
+	  readMatrix(cam_xyz,strstr(eentry->data,"ccm=")+4);
+	}
+
+	if (edata) {
+	  exif_data_unref(edata);
+	}
+
+	// create dng
 	stat (fname, &st);
 	gmtime_r (&st.st_mtime, &tm);
 	sprintf (datetime, "%04d:%02d:%02d %02d:%02d:%02d",
@@ -161,7 +179,7 @@ int main (int argc, char **argv)
 	TIFFSetField (tif, TIFFTAG_SAMPLESPERPIXEL, 1);
 	TIFFSetField (tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
 	TIFFSetField (tif, TIFFTAG_CFAREPEATPATTERNDIM, CFARepeatPatternDim);
-	TIFFSetField (tif, TIFFTAG_CFAPATTERN, 4, CFA_PATTERN);
+	TIFFSetField (tif, TIFFTAG_CFAPATTERN, 4, cfaPattern);
 	//TIFFSetField (tif, TIFFTAG_LINEARIZATIONTABLE, 256, curve);
 	TIFFSetField (tif, TIFFTAG_WHITELEVEL, 1, &white);
 
@@ -223,19 +241,4 @@ void readMatrix(float* matrix,const char* arg) {
       matrix[i] /= 10000;
     }
   }
-}
-
-// read color-matrix from EXIF-data   ----------------------------------------
-
-void readExifMatrix(const char* filename, char* matrix) {
-  ExifData* edata = exif_data_new_from_file(filename);
-  if (!edata) {
-    matrix[0] = '\0';
-    return;
-  }
-  ExifEntry* eentry = exif_content_get_entry(edata->ifd[EXIF_IFD_EXIF],0x927c);
-
-  sscanf(strstr(eentry->data,"ccm=")+4,"%s ",matrix);
-  exif_data_unref(edata);
-  return;
 }
