@@ -36,7 +36,7 @@
                                       // old: BGGR
 
 void readMatrix(float[9],const char*);
-void getMatrx(char*, char*);
+void readExifMatrix(const char*, char*);
 void readGains(float[3], const char*);
 
 int main (int argc, char **argv)
@@ -67,12 +67,11 @@ int main (int argc, char **argv)
 	unsigned short pixel[HPIXELS];  // array holds 16 bits per pixel
 	unsigned char split;        // single byte with 4 pairs of low-order bits
 
-	if (argc < 3 || argc > 5) {
-		fprintf (stderr, "Usage: %s infile outfile [color-matrix] "
-			 "[red-gain,blue-gain]\n"
+	if (argc < 3 || argc > 4) {
+		fprintf (stderr, "Usage: %s infile outfile [color-matrix]\n"
 			"Example: %s rpi.jpg output.dng " 
-                         "\"8032,-3478,-274,-1222,5560,-240,100,-2714,6716\" "
-			 "\"1.54,1.08\"\n", argv[0], argv[0]);
+                         "\"8032,-3478,-274,-1222,5560,-240,100,-2714,6716\"\n",
+			 argv[0], argv[0]);
 		return 1;
 	}
 
@@ -87,15 +86,10 @@ int main (int argc, char **argv)
 	  readMatrix(cam_xyz,argv[3]);
 	} else {
 	  char matrix[128];
-	  getMatrix(fname,matrix);
+	  readExifMatrix(fname,matrix);
 	  if (strlen(matrix)) {
 	    readMatrix(cam_xyz,matrix);
 	  }
-	}
-
-	// read gain-values if passed as fourth argument
-	if (argc >= 5) {
-	  readGains(neutral,argv[4]);
 	}
 
 	stat (fname, &st);
@@ -233,7 +227,7 @@ void readMatrix(float* matrix,const char* arg) {
 
 // read color-matrix from EXIF-data   ----------------------------------------
 
-void getMatrix(char* filename, char* matrix) {
+void readExifMatrix(const char* filename, char* matrix) {
   ExifData* edata = exif_data_new_from_file(filename);
   if (!edata) {
     matrix[0] = '\0';
@@ -244,10 +238,4 @@ void getMatrix(char* filename, char* matrix) {
   sscanf(strstr(eentry->data,"ccm=")+4,"%s ",matrix);
   exif_data_unref(edata);
   return;
-}
-
-// parse gain-values from the command-line   ---------------------------------
-
-void readGains(float* neutral, const char* arg) {
-  sscanf(arg,"%f, %f",&neutral[0],&neutral[2]);
 }
