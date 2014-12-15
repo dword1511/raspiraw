@@ -6,6 +6,22 @@ Raspberry Pi CSI camera board JPEG+RAW photo to Adobe DNG converter (``raspi_dng
 Changes
 =======
 
+Version 2.2
+-----------
+
+The converter now supports old raw images (model: ov5647) and new
+raw images (model: RP_OV5647).
+
+Unless a matrix is provided as the third argument, the converter uses the
+embedded color matrix.
+
+The wrapper script now supports a number of additional options, e.g.
+direct conversion to tif using dcraw. Run
+
+  ./raspi_dng.sh -h
+
+for a short help.
+
 Version 2.1
 -----------
 
@@ -35,7 +51,10 @@ as soon as possible.
 Prerequisites
 =============
 
-C compiler, Internet connection to download the required version of libtiff and a patch.
+C compiler, Internet connection to download the required version of
+libtiff and a patch. Starting with version 2.2, you also need to
+install libexif-devel (or however your distribution calls the package).
+
 
 Build instructions
 ==================
