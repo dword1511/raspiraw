@@ -13,11 +13,11 @@ usage() {
   echo -e "\n`basename $0`: convert raw-image from Raspberry Pi camera module\n\
   \nusage: `basename $0` [options] input-file\n\
   possible options:\n\
-    -m     use embedded color matrix\n\
-    -g     use embedded white-balance gains\n\
-    -c     convert from jpg to dng to tif with dcraw\n\
-    -D     delete intermediate dng file (only needed with -c)\n\
-    -h     show this help\n\
+    -M matrix use given matrix instead of embedded color matrix\n\
+    -g        use embedded white-balance gains (experimental, use with -c)\n\
+    -c        convert from jpg to dng to tif with dcraw\n\
+    -D        delete intermediate dng file (only needed with -c)\n\
+    -h        show this help\n\
 " >&2
   exit 3
 }
@@ -25,19 +25,19 @@ usage() {
 # --- set defaults   -----------------------------------------------------------
 
 setDefaults() {
-  useMatrix=0
+  matrix=""
   useGains=0
   useDcraw=0
   keepDNG=1
-  DCRAW_ARGS="-v -w -a -f -o 1 -q 3 -T -6"
+  DCRAW_ARGS="-v -f -o 1 -q 3 -T -6"
 }
 
 # --- parse arguments   --------------------------------------------------------
 
 parseArguments() {
-  while getopts ":mgcDh" opt; do
+  while getopts ":M:gcDh" opt; do
     case $opt in
-      m) useMatrix=1;;
+      M) matrix="$OPTARG";;
       g) useGains=1;;
       c) useDcraw=1;;
       D) [ $useDcraw -eq 1 ] && keepDNG=0;;
@@ -70,17 +70,11 @@ checkArguments() {
 extractExifInfo() {
   local exifinfo=`exiftool -b -makernoteunknowntext "$infile"`
 
-  # color matrix
-  matrix=`sed -e 's/.*ccm=\([^ ]*\) .*/\1/' <<< "$exifinfo" | \
-              cut -d',' -f 1-9`
-  echo -e "[info] color matrix: $matrix" >&2
-
   # whitebalance gains
   [ $useGains -eq 0 ] && return
-  local gain_r=`sed -e 's/.*gain_r=\([^ ]*\) .*/\1/' <<< "$exifinfo"`
-  local gain_b=`sed -e 's/.*gain_b=\([^ ]*\) .*/\1/' <<< "$exifinfo"`
-  gains="$gain_r,$gain_b"
-  echo -e "[info] white-balance gains:: $gains" >&2
+  gain_r=`sed -e 's/.*gain_r=\([^ ]*\) .*/\1/' <<< "$exifinfo"`
+  gain_b=`sed -e 's/.*gain_b=\([^ ]*\) .*/\1/' <<< "$exifinfo"`
+  echo -e "[info] white-balance gains:: red: $gain_r, blue: $gain_b" >&2
 }
 
 # --- convert image   ----------------------------------------------------------
@@ -88,13 +82,18 @@ extractExifInfo() {
 convertImage() {
   PATH=".:$PATH"
   echo -e "[info] creating file $dngfile" >&2
-  raspi_dng "$infile" "$dngfile" ${matrix:+"$matrix"} ${gains:+"$gains"}
+  raspi_dng "$infile" "$dngfile" ${matrix:+"$matrix"}
   exiftool -q -overwrite_original -tagsFromFile "$infile" "$dngfile"
   dcraw -z "$dngfile"
 
   if [ $useDcraw -eq 1 ]; then
     echo -e "[info] creating file $tiffile" >&2
-    dcraw $DCRAW_ARGS -c "$dngfile" > "$tiffile"
+    if [ $useGains -eq 1 ]; then
+      gains="-r $gain_r 1 $gain_b 1"
+    else
+      gains="-a"
+    fi
+    dcraw $DCRAW_ARGS $gains -c "$dngfile" > "$tiffile"
     exiftool -q -overwrite_original -tagsFromFile "$infile" "$tiffile"
     dcraw -z "$tiffile"
     [ $keepDNG -eq 0 ] && rm "$dngfile"
@@ -106,5 +105,5 @@ convertImage() {
 setDefaults
 parseArguments "$@"
 checkArguments
-[ $useMatrix -eq 1 -o $useGains -eq 1 ] && extractExifInfo
+[ $useGains -eq 1 ] && extractExifInfo
 convertImage
