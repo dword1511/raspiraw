@@ -9,12 +9,7 @@
 
    Free for all uses.
 
-
    Requires LibTIFF 3.8.0 plus a patch, see http://www.cybercom.net/~dcoffin/dcraw/
-
-   Compile with:
-   gcc -o raspi_dng raspi_dng.c -O4 -Wall -lm -ljpeg -ltiff
-   
  */
 
 
@@ -27,6 +22,7 @@
 #include <math.h>
 #include <tiffio.h>
 #include <errno.h>
+#include <libexif/exif-data.h>
 
 
 #define LINELEN 256            // how long a string we need to hold the filename
@@ -36,14 +32,18 @@
 #define IDSIZE 4    // number of bytes in raw header ID string
 #define HPIXELS 2592   // number of horizontal pixels on OV5647 sensor
 #define VPIXELS 1944   // number of vertical pixels on OV5647 sensor
-#define CFA_PATTERN "\001\002\0\001"  // GBRG: 0 = Red, 1 = Green, 2 = Blue
-                                      // old: BGGR
 
 void readMatrix(float[9],const char*);
 
 int main (int argc, char **argv)
 {
 	static const short CFARepeatPatternDim[] = { 2,2 };
+
+	// Bayer patterns (0 = Red, 1 = Green, 2 = Blue)
+	static char* CFA_PATTERN_N  = "\001\002\0\001";  // GBRG
+	static char* CFA_PATTERN_HF = "\002\001\001\0";  // BGGR
+	char* cfaPattern;
+
 	// default color matrix from dcraw
 	float cam_xyz[] = {
 	     //  R        G        B
@@ -51,7 +51,7 @@ int main (int argc, char **argv)
 	       -0.0478,	 0.9066,  0.1413, // G
 		0.1340,	 0.1513,  0.5176  // B
 	};
-	static const float neutral[] = { 1.0, 1.0, 1.0 }; // TODO calibrate
+	float neutral[] = { 1.0, 1.0, 1.0 }; // TODO calibrate
 	long sub_offset=0, white=0xffff;
 
 	int status=1, i, j, row, col;
@@ -72,7 +72,8 @@ int main (int argc, char **argv)
 	if (argc < 3 || argc > 4) {
 		fprintf (stderr, "Usage: %s infile outfile [color-matrix]\n"
 			"Example: %s rpi.jpg output.dng " 
-                         "\"8032,-3478,-274,-1222,5560,-240,100,-2714,6716\"\n", argv[0], argv[0]);
+                         "\"8032,-3478,-274,-1222,5560,-240,100,-2714,6716\"\n",
+			 argv[0], argv[0]);
 		return 1;
 	}
 
@@ -82,11 +83,33 @@ int main (int argc, char **argv)
 		return 1;
 	}
 
-	// read color-matrix if passed as third argument
-	if (argc == 4) {
-	  readMatrix(cam_xyz,argv[3]);
+	// process EXIF-data
+	ExifData* edata = exif_data_new_from_file(fname);
+	ExifEntry* eentry = NULL;
+	if (edata) {
+	  eentry = exif_content_get_entry(edata->ifd[EXIF_IFD_0],EXIF_TAG_MODEL);
+	  if (!strncmp(eentry->data,"ov5647",6)) {
+	    // old version uses current horizontal-flip readout
+	    cfaPattern = CFA_PATTERN_HF;
+	  } else {
+	    // assume normal readout
+	    cfaPattern = CFA_PATTERN_N;
+	  }
 	}
 
+	// read color-matrix if passed as third argument
+	if (argc >= 4) {
+	  readMatrix(cam_xyz,argv[3]);
+	} else if (edata) {
+	  eentry = exif_content_get_entry(edata->ifd[EXIF_IFD_EXIF],0x927c);
+	  readMatrix(cam_xyz,strstr(eentry->data,"ccm=")+4);
+	}
+
+	if (edata) {
+	  exif_data_unref(edata);
+	}
+
+	// create dng
 	stat (fname, &st);
 	gmtime_r (&st.st_mtime, &tm);
 	sprintf (datetime, "%04d:%02d:%02d %02d:%02d:%02d",
@@ -156,7 +179,7 @@ int main (int argc, char **argv)
 	TIFFSetField (tif, TIFFTAG_SAMPLESPERPIXEL, 1);
 	TIFFSetField (tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
 	TIFFSetField (tif, TIFFTAG_CFAREPEATPATTERNDIM, CFARepeatPatternDim);
-	TIFFSetField (tif, TIFFTAG_CFAPATTERN, 4, CFA_PATTERN);
+	TIFFSetField (tif, TIFFTAG_CFAPATTERN, 4, cfaPattern);
 	//TIFFSetField (tif, TIFFTAG_LINEARIZATIONTABLE, 256, curve);
 	TIFFSetField (tif, TIFFTAG_WHITELEVEL, 1, &white);
 
@@ -201,7 +224,7 @@ fail:
 	return status;
 }
 
-// parse color-matrix from command-line
+// parse color-matrix from command-line   ------------------------------------
 
 void readMatrix(float* matrix,const char* arg) {
   sscanf(arg,"%f, %f, %f, "
