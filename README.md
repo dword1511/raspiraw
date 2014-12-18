@@ -53,7 +53,7 @@ Prerequisites
 
 C compiler, Internet connection to download the required version of
 libtiff and a patch. Starting with version 2.2, you also need to
-install libexif-devel (or however your distribution calls the package).
+install libexif-dev (or however your distribution calls the package).
 
 
 Build instructions
