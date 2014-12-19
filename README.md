@@ -12,11 +12,11 @@ Version 2.2
 The converter now supports old raw images (model: ov5647) and new
 raw images (model: RP_OV5647).
 
-Unless a matrix is provided as the third argument, the converter uses the
-embedded color matrix.
+Unless a matrix is provided as the third argument, the converter now
+uses the embedded color matrix automatically.
 
-The wrapper script now supports a number of additional options, e.g.
-direct conversion to tif using dcraw. Run
+The wrapper script has changed accordingly. It supports a number of
+additional options, e.g. direct conversion to tif using dcraw. Run
 
   ./raspi_dng.sh -h
 
@@ -44,9 +44,8 @@ need to process old images, use the original version of raspi_dng.
 N.B.: old images are easily identified: the EXIF-tag 'model' is 'ov5647' for
 old images and 'RP_OV5647' for new images.
 
-The makefile now supports compilation on 64bit Linux systems. This might
-break compilation on a Raspberry Pi, I will check (and correct if necessary)
-as soon as possible.
+The makefile now supports compilation on the RPI (but see note below) and on 
+64bit Linux systems.
 
 Prerequisites
 =============
@@ -59,7 +58,16 @@ install libexif-dev (or however your distribution calls the package).
 Build instructions
 ==================
 
-Run ``make``, you will need a working Internet connection on the first run.
+Just run ``make``, you will need a working Internet connection on the first run.
+
+
+**IMPORTANT NOTE**: raspi_dng does not work correctly on the RPI itself, since
+the color-matrix is not stored correctly in the dng-file (negative values
+are stored as zeros). This is due to a problem within the tiff-library.
+So it is recommended to download the image-files to a PC and to convert the
+files there. Help on this issue is highly welcome.
+
+
 
 
 Usage
