@@ -30,5 +30,4 @@
 local
 tiff-*
 raspi_dng
-raspiraw
-
+rpi2dng
