@@ -12,8 +12,6 @@
    Requires LibTIFF 3.8.0 plus a patch, see http://www.cybercom.net/~dcoffin/dcraw/
  */
 
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +21,7 @@
 #include <tiffio.h>
 #include <errno.h>
 #include <libexif/exif-data.h>
-
+#include <unistd.h>
 
 #define LINELEN 256            // how long a string we need to hold the filename
 #define RAWBLOCKSIZE 6404096
@@ -33,25 +31,50 @@
 #define HPIXELS 2592   // number of horizontal pixels on OV5647 sensor
 #define VPIXELS 1944   // number of vertical pixels on OV5647 sensor
 
+// prototypes   --------------------------------------------------------------
+
 void readMatrix(float[9],const char*);
 void processFile(char* inFile, char* outFile, char* matrix);
+void usage(const char* pgmName);
+
+// main program   ------------------------------------------------------------
 
 int main (int argc, char **argv) {
-  const char* fname = argv[1];
 
-  if (argc < 3 || argc > 4) {
-    fprintf (stderr, "Usage: %s infile outfile [color-matrix]\n"
-	     "Example: %s rpi.jpg output.dng " 
-	     "\"8032,-3478,-274,-1222,5560,-240,100,-2714,6716\"\n",
-	     argv[0], argv[0]);
-    return 1;
+  char *matrix = NULL, *outFile = NULL;
+  int opt;
+
+  while ((opt = getopt(argc, argv, ":M:o:")) != -1) {
+    switch (opt) {
+    case 'M':
+      matrix = strdup(optarg);
+      break;
+    case 'o':
+      outFile = strdup(optarg);
+      break;
+    default: /* '?' */
+      usage(argv[0]);
+    }
   }
 
-  if (argc == 3) {
-    processFile(argv[1],argv[2],NULL);
-  } else {
-    processFile(argv[1],argv[2],argv[3]);
+  if (optind >= argc) {
+    usage(argv[0]);      // expect at least one input-filename
   }
+
+  while (optind < argc) {
+    processFile(argv[optind++],outFile,matrix);
+  }
+}
+
+// show usage information and exit   -----------------------------------------
+
+void usage(const char* pgmName) {
+  fprintf (stderr, "Usage: %s [options] infile [...]\n\n"
+	   "Options:\n"
+           "\t-o outfile  create `outfile´ instead of infile with dng-extension\n"
+           "\t-M matrix   use given matrix instead of embedded one for conversion\n",
+	   pgmName);
+  exit(EXIT_FAILURE);
 }
 
 // process single file   -----------------------------------------------------
@@ -135,20 +158,26 @@ void processFile(char* inFile, char* outFile, char* matrix) {
   }
   offset = (fileLen - RAWBLOCKSIZE) ;  // location in file the raw header starts
   fseek(ifp, offset, SEEK_SET); 
- 
-  //printf("File length = %d bytes.\n",fileLen);
-  //printf("offset = %d:",offset);
+
+  // get filename for dng-file
+  char *dngFile = NULL;
+  if (outFile == NULL) {
+    dngFile = strdup(inFile);
+    strcpy(dngFile+strlen(dngFile)-3,"dng");
+  } else {
+    dngFile = outFile;
+  }
+
+  if (!(tif = TIFFOpen (dngFile, "w"))) goto fail;
+  fprintf(stderr,"creating %s...\n",dngFile);
 
   //Allocate memory for one line of pixel data
   buffer=(unsigned char *)malloc(ROWSIZE+1);
-  if (!buffer)
-    {
-      fprintf(stderr, "Memory error!");
-      goto fail;
-    }
+  if (!buffer) {
+    fprintf(stderr, "Memory error!");
+    goto fail;
+  }
 		
-  if (!(tif = TIFFOpen (outFile, "w"))) goto fail;
-
   //fprintf(stderr, "Writing TIFF header...\n");
 	
   TIFFSetField (tif, TIFFTAG_SUBFILETYPE, 1);
@@ -228,8 +257,12 @@ void processFile(char* inFile, char* outFile, char* matrix) {
   free(buffer); // free up that memory we allocated
 
   TIFFClose (tif);
+
  fail:
   fclose (ifp);
+  if (outFile == NULL && dngFile != NULL) {
+    free(dngFile);
+  }
   return;
 }
 
