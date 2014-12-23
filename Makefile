@@ -31,3 +31,10 @@ raspi_dng.o: local/lib$(LIBSUFFIX)/libtiff.a raspi_dng.c
 raspi_dng: raspi_dng.o local/lib$(LIBSUFFIX)/libtiff.a
 	$(CC) raspi_dng.o local/lib$(LIBSUFFIX)/libtiff.a \
 			-ljpeg -lm -lz -lexif -o $@
+
+rpi2dng.o: local/lib$(LIBSUFFIX)/libtiff.a rpi2dng.c
+	$(CC) $(CCFLAGS) -c rpi2dng.c -I./local/include -o $@
+
+rpi2dng: rpi2dng.o local/lib$(LIBSUFFIX)/libtiff.a
+	$(CC) rpi2dng.o local/lib$(LIBSUFFIX)/libtiff.a \
+			-ljpeg -lm -lz -lexif -o $@
