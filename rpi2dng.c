@@ -117,6 +117,15 @@ void processFile(char* inFile, char* outFile, char* matrix) {
     return;
   }
 
+  //Get file length
+  fseek(ifp, 0, SEEK_END);
+  fileLen=ftell(ifp);
+  if (fileLen < RAWBLOCKSIZE) {
+    fprintf(stderr, "File %s too short to contain expected 6MB RAW data.\n",
+	    inFile);
+    return;
+  }
+
   // process EXIF-data
   ExifData* edata = exif_data_new_from_file(inFile);
   ExifEntry* eentry = NULL;
@@ -129,35 +138,19 @@ void processFile(char* inFile, char* outFile, char* matrix) {
       // assume normal readout
       cfaPattern = CFA_PATTERN_N;
     }
+  } else {
+    fprintf(stderr,"File %s contains no EXIF-data (and therefore no raw-data\n");
+    return;
   }
 
   // read color-matrix if passed as third argument
   if (matrix != NULL) {
     readMatrix(cam_xyz,matrix);
-  } else if (edata) {
+  } else {
     eentry = exif_content_get_entry(edata->ifd[EXIF_IFD_EXIF],0x927c);
     readMatrix(cam_xyz,strstr(eentry->data,"ccm=")+4);
   }
-
-  if (edata) {
-    exif_data_unref(edata);
-  }
-
-  // create dng
-  stat (inFile, &st);
-  gmtime_r (&st.st_mtime, &tm);
-  sprintf (datetime, "%04d:%02d:%02d %02d:%02d:%02d",
-	   tm.tm_year+1900,tm.tm_mon+1,tm.tm_mday,tm.tm_hour,tm.tm_min,tm.tm_sec);
-
-  //Get file length
-  fseek(ifp, 0, SEEK_END);
-  fileLen=ftell(ifp);
-  if (fileLen < RAWBLOCKSIZE) {
-    fprintf(stderr, "File %s too short to contain expected 6MB RAW data.\n", inFile);
-    exit(1);
-  }
-  offset = (fileLen - RAWBLOCKSIZE) ;  // location in file the raw header starts
-  fseek(ifp, offset, SEEK_SET); 
+  exif_data_unref(edata);
 
   // get filename for dng-file
   char *dngFile = NULL;
@@ -168,9 +161,6 @@ void processFile(char* inFile, char* outFile, char* matrix) {
     dngFile = outFile;
   }
 
-  if (!(tif = TIFFOpen (dngFile, "w"))) goto fail;
-  fprintf(stderr,"creating %s...\n",dngFile);
-
   //Allocate memory for one line of pixel data
   buffer=(unsigned char *)malloc(ROWSIZE+1);
   if (!buffer) {
@@ -178,8 +168,11 @@ void processFile(char* inFile, char* outFile, char* matrix) {
     goto fail;
   }
 		
-  //fprintf(stderr, "Writing TIFF header...\n");
-	
+  if (!(tif = TIFFOpen (dngFile, "w"))) goto fail;
+  fprintf(stderr,"creating %s...\n",dngFile);
+
+  // create and write tiff-header
+  fprintf(stderr,"\twriting tif-header...\n");
   TIFFSetField (tif, TIFFTAG_SUBFILETYPE, 1);
   TIFFSetField (tif, TIFFTAG_IMAGEWIDTH, HPIXELS >> 4);
   TIFFSetField (tif, TIFFTAG_IMAGELENGTH, VPIXELS >> 4);
@@ -187,12 +180,18 @@ void processFile(char* inFile, char* outFile, char* matrix) {
   TIFFSetField (tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
   TIFFSetField (tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
   TIFFSetField (tif, TIFFTAG_MAKE, "Raspberry Pi");
-  TIFFSetField (tif, TIFFTAG_MODEL, "Model OV5647");
+  TIFFSetField (tif, TIFFTAG_MODEL, "RP_OV5647");
   TIFFSetField (tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
   TIFFSetField (tif, TIFFTAG_SAMPLESPERPIXEL, 3);
   TIFFSetField (tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-  TIFFSetField (tif, TIFFTAG_SOFTWARE, "raspi_dng");
+  TIFFSetField (tif, TIFFTAG_SOFTWARE, "rpi2dng");
+
+  stat(inFile, &st);
+  gmtime_r(&st.st_mtime, &tm);
+  sprintf(datetime, "%04d:%02d:%02d %02d:%02d:%02d",
+	   tm.tm_year+1900,tm.tm_mon+1,tm.tm_mday,tm.tm_hour,tm.tm_min,tm.tm_sec);
   TIFFSetField (tif, TIFFTAG_DATETIME, datetime);
+
   TIFFSetField (tif, TIFFTAG_SUBIFD, 1, &sub_offset);
   TIFFSetField (tif, TIFFTAG_DNGVERSION, "\001\001\0\0");
   TIFFSetField (tif, TIFFTAG_DNGBACKWARDVERSION, "\001\0\0\0");
@@ -202,13 +201,10 @@ void processFile(char* inFile, char* outFile, char* matrix) {
   TIFFSetField (tif, TIFFTAG_CALIBRATIONILLUMINANT1, 21);
   TIFFSetField (tif, TIFFTAG_ORIGINALRAWFILENAME, inFile);
 
-  // fprintf(stderr, "Writing TIFF thumbnail...\n");
   memset (pixel, 0, HPIXELS);	// all-black thumbnail 
   for (row=0; row < VPIXELS >> 4; row++)
     TIFFWriteScanline (tif, pixel, row, 0);
   TIFFWriteDirectory (tif);
-
-  // fprintf(stderr, "Writing TIFF header for main image...\n");
 
   TIFFSetField (tif, TIFFTAG_SUBFILETYPE, 0);
   TIFFSetField (tif, TIFFTAG_IMAGEWIDTH, HPIXELS);
@@ -222,21 +218,19 @@ void processFile(char* inFile, char* outFile, char* matrix) {
   //TIFFSetField (tif, TIFFTAG_LINEARIZATIONTABLE, 256, curve);
   TIFFSetField (tif, TIFFTAG_WHITELEVEL, 1, &white);
 
-  fprintf(stderr, "Processing RAW data...\n");
+  fprintf(stderr, "\tcopying RAW data...\n");
   // for one file, (TotalFileLength:11112983 - RawBlockSize:6404096) + Header:32768 = 4741655
   // The pixel data is arranged in the file in rows, with 3264 bytes per row.
   // with 3264 bytes per row x 1944 rows we have 6345216 bytes, that is the full 2592x1944 image area.
  
-  //Read one line of pixel data into buffer
-  fread(buffer, IDSIZE, 1, ifp);
-
   // now on to the pixel data
-  offset = (fileLen - RAWBLOCKSIZE) + HEADERSIZE;  // location in file the raw pixel data starts
+  // location in file the raw pixel data starts
+  offset = (fileLen - RAWBLOCKSIZE) + HEADERSIZE;
   fseek(ifp, offset, SEEK_SET);
 
-  for (row=0; row < VPIXELS; row++) {  // iterate over pixel rows
-    fread(buffer, ROWSIZE, 1, ifp);  // read next line of pixel data
-    j = 0;  // offset into buffer
+  for (row=0; row < VPIXELS; row++) {        // iterate over pixel rows
+    fread(buffer, ROWSIZE, 1, ifp);          // read next line of pixel data
+    j = 0;                                   // offset into buffer
     for (col = 0; col < HPIXELS; col+= 4) {  // iterate over pixel columns
       pixel[col+0] = buffer[j++] << 8;
       pixel[col+1] = buffer[j++] << 8;
@@ -250,15 +244,14 @@ void processFile(char* inFile, char* outFile, char* matrix) {
     }
     if (TIFFWriteScanline (tif, pixel, row, 0) != 1) {
       fprintf(stderr, "Error writing TIFF scanline.");
-      exit(1);
+      goto fail;
     }
-  } // end for(k..)
-
-  free(buffer); // free up that memory we allocated
+  }
 
   TIFFClose (tif);
 
  fail:
+  free(buffer); // free up that memory we allocated
   fclose (ifp);
   if (outFile == NULL && dngFile != NULL) {
     free(dngFile);
