@@ -5,7 +5,7 @@ else
   LIBSUFFIX=
 endif
 
-all: raspi_dng
+all: rpi2dng
 
 tiff-3.8.2.tar.gz:
 	wget -nc 'http://dl.maptools.org/dl/libtiff/tiff-3.8.2.tar.gz'
