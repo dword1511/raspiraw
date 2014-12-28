@@ -34,7 +34,7 @@
 // prototypes   --------------------------------------------------------------
 
 void readMatrix(float[9],const char*);
-void processFile(char* inFile, char* outFile, char* matrix);
+void processFile(char* inFile, char* outFile, char* matrix, int pattern);
 void usage(const char* pgmName);
 
 // main program   ------------------------------------------------------------
@@ -42,10 +42,17 @@ void usage(const char* pgmName);
 int main (int argc, char **argv) {
 
   char *matrix = NULL, *outFile = NULL;
+  int pattern=0;
   int opt;
 
-  while ((opt = getopt(argc, argv, ":M:o:")) != -1) {
+  while ((opt = getopt(argc, argv, ":HVM:o:")) != -1) {
     switch (opt) {
+    case 'H':
+      pattern+=1;
+      break;
+    case 'V':
+      pattern+=2;
+      break;
     case 'M':
       matrix = strdup(optarg);
       break;
@@ -62,7 +69,7 @@ int main (int argc, char **argv) {
   }
 
   while (optind < argc) {
-    processFile(argv[optind++],outFile,matrix);
+    processFile(argv[optind++],outFile,matrix,pattern);
   }
 }
 
@@ -71,6 +78,8 @@ int main (int argc, char **argv) {
 void usage(const char* pgmName) {
   fprintf (stderr, "Usage: %s [options] infile [...]\n\n"
 	   "Options:\n"
+           "\t-H          assume horizontal flip (option -HF of raspistill)\n"
+           "\t-V          assume vertical flip (option -VF of raspistill)\n"
            "\t-o outfile  create `outfile´ instead of infile with dng-extension\n"
            "\t-M matrix   use given matrix instead of embedded one for conversion\n",
 	   pgmName);
@@ -79,12 +88,16 @@ void usage(const char* pgmName) {
 
 // process single file   -----------------------------------------------------
 
-void processFile(char* inFile, char* outFile, char* matrix) {
+void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
   static const short CFARepeatPatternDim[] = { 2,2 };
 
   // Bayer patterns (0 = Red, 1 = Green, 2 = Blue)
-  static char* CFA_PATTERN_N  = "\001\002\0\001";  // GBRG
-  static char* CFA_PATTERN_HF = "\002\001\001\0";  // BGGR
+  static char* CFA_PATTERN[]  = {
+    "\001\002\0\001",   // GBRG - normal
+    "\002\001\001\0",   // BGGR - flipped HF
+    "\0\001\001\002",   // RGGB - flipped VF
+    "\001\0\002\001"    // GRBG - flipped twice
+  };
   char* cfaPattern;
 
   // default color matrix from dcraw
@@ -133,10 +146,10 @@ void processFile(char* inFile, char* outFile, char* matrix) {
     eentry = exif_content_get_entry(edata->ifd[EXIF_IFD_0],EXIF_TAG_MODEL);
     if (!strncmp(eentry->data,"ov5647",6)) {
       // old version uses current horizontal-flip readout
-      cfaPattern = CFA_PATTERN_HF;
+      // no support for -H and -V options for old files
+      cfaPattern = CFA_PATTERN[1];
     } else {
-      // assume normal readout
-      cfaPattern = CFA_PATTERN_N;
+      cfaPattern = CFA_PATTERN[pattern];
     }
   } else {
     fprintf(stderr,"File %s contains no EXIF-data (and therefore no raw-data\n");
