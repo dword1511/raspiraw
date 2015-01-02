@@ -1,6 +1,6 @@
 #!/bin/bash
 # ------------------------------------------------------------------------------
-# Shell-wrapper for the raspi_dng converter.
+# Shell-wrapper for the rpi2dng converter.
 #
 # Copyright: Bernhard Bablok (bablokb at gmx dot de)
 # License:   GPL3
@@ -13,6 +13,8 @@ usage() {
   echo -e "\n`basename $0`: convert raw-image from Raspberry Pi camera module\n\
   \nusage: `basename $0` [options] input-file\n\
   possible options:\n\
+    -H        assume horizontal flip (option -HF of raspistill)\n\
+    -V        assume vertical flip (option -VF of raspistill)\n\
     -M matrix use given matrix instead of embedded color matrix\n\
     -g        use embedded white-balance gains (experimental, use with -c)\n\
     -c        convert from jpg to dng to tif with dcraw\n\
@@ -26,6 +28,7 @@ usage() {
 
 setDefaults() {
   matrix=""
+  flip=""
   useGains=0
   useDcraw=0
   keepDNG=1
@@ -35,9 +38,11 @@ setDefaults() {
 # --- parse arguments   --------------------------------------------------------
 
 parseArguments() {
-  while getopts ":M:gcDh" opt; do
+  while getopts ":M:HVgcDh" opt; do
     case $opt in
       M) matrix="$OPTARG";;
+      H) flip="$flip -H";;
+      V) flip="$flip -V";;
       g) useGains=1;;
       c) useDcraw=1;;
       D) [ $useDcraw -eq 1 ] && keepDNG=0;;
@@ -82,7 +87,7 @@ extractExifInfo() {
 convertImage() {
   PATH=".:$PATH"
   echo -e "[info] creating file $dngfile" >&2
-  raspi_dng "$infile" "$dngfile" ${matrix:+"$matrix"}
+  rpi2dng "$infile" $flip -o "$dngfile" ${matrix:+-M "$matrix"}
   exiftool -q -overwrite_original -tagsFromFile "$infile" "$dngfile"
   dcraw -z "$dngfile"
 
