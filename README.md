@@ -1,10 +1,26 @@
 raspiraw
 ========
 
-Raspberry Pi CSI camera board JPEG+RAW photo to Adobe DNG converter (``raspi_dng``)
+Raspberry Pi CSI camera board JPEG+RAW photo to Adobe DNG converter
+(`rpi2dng`).
 
 Changes
 =======
+
+Version 2.3
+-----------
+
+New executable **rpi2dng**. The old executable **raspi_dng** is marked
+as deprecated and will no longer be maintained.
+
+New features of **rpi2dng**:
+
+  - unix-style commandline interface
+  - processes all files passed on the commandline at once, so
+    `./rpi2dng /some/dir/*.jpg` will process all jpgs in that
+    directory at once.
+  - use `./rpi2dng -h` for help
+
 
 Version 2.2
 -----------
