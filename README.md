@@ -20,6 +20,8 @@ New features of **rpi2dng**:
     `./rpi2dng /some/dir/*.jpg` will process all jpgs in that
     directory at once.
   - use `./rpi2dng -h` for help
+  - replaced `raspi_dng.sh` with `rpi2dng.sh` and support new features
+    of `rpi2dng`
 
 
 Version 2.2
