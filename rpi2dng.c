@@ -152,7 +152,8 @@ void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
       cfaPattern = CFA_PATTERN[pattern];
     }
   } else {
-    fprintf(stderr,"File %s contains no EXIF-data (and therefore no raw-data\n");
+    fprintf(stderr,"File %s contains no EXIF-data (and therefore no raw-data\n",
+        inFile);
     return;
   }
 
