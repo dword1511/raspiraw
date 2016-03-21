@@ -1,0 +1,2 @@
+Contains a enhanced rpi2dng. This is a subset of https://github.com/bablokb/raspiraw .
+Needs libtiff5-dev, libjpeg-dev and libexif-dev to build. Does not need patched libTIFF anymore.

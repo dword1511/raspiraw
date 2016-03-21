@@ -1,15 +1,13 @@
-/* Read in jpeg from Raspberry Pi camera captured using 'raspistill --raw'
-   and extract raw file with 10-bit values stored left-justified at 16 bpp
+/* Read in JPEG from Raspberry Pi camera captured using 'raspistill --raw'
+   and extract RAW file with 10-bit values stored left-justified at 16 bpp
    in Adobe DNG (TIFF-EP) format, convert with 'ufraw out.dng' for example
 
    John Beale  26 May 2013
    and others
-   
+
    Contains code written by Dave Coffin for Berkeley Engineering and Research.
 
    Free for all uses.
-
-   Requires LibTIFF 3.8.0 plus a patch, see http://www.cybercom.net/~dcoffin/dcraw/
  */
 
 #include <stdio.h>
@@ -87,12 +85,7 @@ void usage(const char* pgmName) {
 }
 
 // process single file   -----------------------------------------------------
-static void errorhandler(const char* module, const char* fmt, va_list ap)
-{
-  char errorbuffer[1024];
-  vsnprintf(errorbuffer, 1024, fmt, ap);
-  fputs(errorbuffer, stderr);
-}
+
 
 // Bayer patterns (0 = Red, 1 = Green, 2 = Blue)
 static const char* CFA_PATTERN[]  = {
@@ -105,7 +98,7 @@ static const char* CFA_PATTERN[]  = {
 void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
   static const short CFARepeatPatternDim[] = { 2,2 };
 
-  char* cfaPattern;
+  const char* cfaPattern;
 
   // default color matrix from dcraw
   float cam_xyz[] = {
@@ -193,47 +186,18 @@ void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
   if (!(tif = TIFFOpen (dngFile, "w"))) goto fail;
   fprintf(stderr,"creating %s...\n",dngFile);
 
-  /*
-  // create and write tiff-header
-  fprintf(stderr,"\twriting tif-header...\n");
-  TIFFSetField (tif, TIFFTAG_SUBFILETYPE, 1);
-  TIFFSetField (tif, TIFFTAG_IMAGEWIDTH, HPIXELS >> 4);
-  TIFFSetField (tif, TIFFTAG_IMAGELENGTH, VPIXELS >> 4);
-  TIFFSetField (tif, TIFFTAG_BITSPERSAMPLE, 8);
-  TIFFSetField (tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
-  TIFFSetField (tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
-  TIFFSetField (tif, TIFFTAG_SAMPLESPERPIXEL, 3);
-  TIFFSetField (tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-
-
-  TIFFSetField (tif, TIFFTAG_SUBIFD, 1, &sub_offset);
-  TIFFSetField (tif, TIFFTAG_DNGVERSION, "\001\001\0\0");
-  TIFFSetField (tif, TIFFTAG_DNGBACKWARDVERSION, "\001\0\0\0");
-  TIFFSetField (tif, TIFFTAG_UNIQUECAMERAMODEL, "Raspberry Pi - OV5647");
-  TIFFSetField (tif, TIFFTAG_COLORMATRIX1, 9, cam_xyz);
-  TIFFSetField (tif, TIFFTAG_ASSHOTNEUTRAL, 3, neutral);
-  TIFFSetField (tif, TIFFTAG_CALIBRATIONILLUMINANT1, 21);
-  TIFFSetField (tif, TIFFTAG_ORIGINALRAWFILENAME, inFile);
-
-  memset (pixel, 0, HPIXELS);	// all-black thumbnail 
-  for (row=0; row < VPIXELS >> 4; row++)
-    TIFFWriteScanline (tif, pixel, row, 0);
-  TIFFWriteDirectory (tif);
-  */
-  //TIFFSetErrorHandler(errorhandler);
-
-  TIFFSetField (tif, TIFFTAG_MAKE, "Raspberry Pi");
-  TIFFSetField (tif, TIFFTAG_MODEL, "RP_OV5647");
-  TIFFSetField (tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
-  TIFFSetField (tif, TIFFTAG_SOFTWARE, "rpi2dng");
-  TIFFSetField (tif, TIFFTAG_SUBIFD, 1, &sub_offset);
-  TIFFSetField (tif, TIFFTAG_DNGVERSION, "\001\001\0\0");
-  TIFFSetField (tif, TIFFTAG_DNGBACKWARDVERSION, "\001\0\0\0");
-  TIFFSetField (tif, TIFFTAG_UNIQUECAMERAMODEL, "Raspberry Pi - OV5647");
-  TIFFSetField (tif, TIFFTAG_COLORMATRIX1, 9, cam_xyz);
-  TIFFSetField (tif, TIFFTAG_ASSHOTNEUTRAL, 3, neutral);
-  TIFFSetField (tif, TIFFTAG_CALIBRATIONILLUMINANT1, 21);
-  TIFFSetField (tif, TIFFTAG_ORIGINALRAWFILENAME, inFile);
+  TIFFSetField(tif, TIFFTAG_MAKE, "Raspberry Pi");
+  TIFFSetField(tif, TIFFTAG_MODEL, "RP_OV5647");
+  TIFFSetField(tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+  TIFFSetField(tif, TIFFTAG_SOFTWARE, "rpi2dng");
+  TIFFSetField(tif, TIFFTAG_SUBIFD, 1, &sub_offset);
+  TIFFSetField(tif, TIFFTAG_DNGVERSION, "\001\001\0\0");
+  TIFFSetField(tif, TIFFTAG_DNGBACKWARDVERSION, "\001\0\0\0");
+  TIFFSetField(tif, TIFFTAG_UNIQUECAMERAMODEL, "Raspberry Pi - OV5647");
+  TIFFSetField(tif, TIFFTAG_COLORMATRIX1, 9, cam_xyz);
+  TIFFSetField(tif, TIFFTAG_ASSHOTNEUTRAL, 3, neutral);
+  TIFFSetField(tif, TIFFTAG_CALIBRATIONILLUMINANT1, 21);
+  TIFFSetField(tif, TIFFTAG_ORIGINALRAWFILENAME, strlen(inFile), inFile);
   TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
 
   stat(inFile, &st);
@@ -249,7 +213,7 @@ void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
   TIFFSetField (tif, TIFFTAG_SAMPLESPERPIXEL, 1);
   TIFFSetField (tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
   TIFFSetField (tif, TIFFTAG_CFAREPEATPATTERNDIM, CFARepeatPatternDim);
-  TIFFSetField (tif, TIFFTAG_CFAPATTERN, 4, cfaPattern);
+  TIFFSetField (tif, TIFFTAG_CFAPATTERN, cfaPattern);
   //TIFFSetField (tif, TIFFTAG_LINEARIZATIONTABLE, 256, curve);
   TIFFSetField (tif, TIFFTAG_WHITELEVEL, 1, &white);
   TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, 1); /* One row per stripe */
