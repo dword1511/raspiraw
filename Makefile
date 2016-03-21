@@ -1,3 +1,5 @@
+CCFLAGS=-Wall
+
 ARCH=$(shell uname -m)
 ifeq ($(ARCH),x86_64)
   LIBSUFFIX=64

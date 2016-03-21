@@ -87,17 +87,24 @@ void usage(const char* pgmName) {
 }
 
 // process single file   -----------------------------------------------------
+static void errorhandler(const char* module, const char* fmt, va_list ap)
+{
+  char errorbuffer[1024];
+  vsnprintf(errorbuffer, 1024, fmt, ap);
+  fputs(errorbuffer, stderr);
+}
+
+// Bayer patterns (0 = Red, 1 = Green, 2 = Blue)
+static const char* CFA_PATTERN[]  = {
+  "\001\002\0\001",   // GBRG - normal
+  "\002\001\001\0",   // BGGR - flipped HF
+  "\0\001\001\002",   // RGGB - flipped VF
+  "\001\0\002\001"    // GRBG - flipped twice
+};
 
 void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
   static const short CFARepeatPatternDim[] = { 2,2 };
 
-  // Bayer patterns (0 = Red, 1 = Green, 2 = Blue)
-  static char* CFA_PATTERN[]  = {
-    "\001\002\0\001",   // GBRG - normal
-    "\002\001\001\0",   // BGGR - flipped HF
-    "\0\001\001\002",   // RGGB - flipped VF
-    "\001\0\002\001"    // GRBG - flipped twice
-  };
   char* cfaPattern;
 
   // default color matrix from dcraw
@@ -110,6 +117,7 @@ void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
   float neutral[] = { 1.0, 1.0, 1.0 }; // TODO calibrate
   long sub_offset=0, white=0xffff;
 
+  //int res;
   int i, j, row, col;
   unsigned short curve[256];
   struct stat st;
@@ -144,7 +152,7 @@ void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
   ExifEntry* eentry = NULL;
   if (edata) {
     eentry = exif_content_get_entry(edata->ifd[EXIF_IFD_0],EXIF_TAG_MODEL);
-    if (!strncmp(eentry->data,"ov5647",6)) {
+    if (!strncmp((const char *)eentry->data,"ov5647",6)) {
       // old version uses current horizontal-flip readout
       // no support for -H and -V options for old files
       cfaPattern = CFA_PATTERN[1];
@@ -162,7 +170,7 @@ void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
     readMatrix(cam_xyz,matrix);
   } else {
     eentry = exif_content_get_entry(edata->ifd[EXIF_IFD_EXIF],0x927c);
-    readMatrix(cam_xyz,strstr(eentry->data,"ccm=")+4);
+    readMatrix(cam_xyz,strstr((const char *)eentry->data,"ccm=")+4);
   }
   exif_data_unref(edata);
 
@@ -185,6 +193,7 @@ void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
   if (!(tif = TIFFOpen (dngFile, "w"))) goto fail;
   fprintf(stderr,"creating %s...\n",dngFile);
 
+  /*
   // create and write tiff-header
   fprintf(stderr,"\twriting tif-header...\n");
   TIFFSetField (tif, TIFFTAG_SUBFILETYPE, 1);
@@ -193,18 +202,9 @@ void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
   TIFFSetField (tif, TIFFTAG_BITSPERSAMPLE, 8);
   TIFFSetField (tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
   TIFFSetField (tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
-  TIFFSetField (tif, TIFFTAG_MAKE, "Raspberry Pi");
-  TIFFSetField (tif, TIFFTAG_MODEL, "RP_OV5647");
-  TIFFSetField (tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
   TIFFSetField (tif, TIFFTAG_SAMPLESPERPIXEL, 3);
   TIFFSetField (tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-  TIFFSetField (tif, TIFFTAG_SOFTWARE, "rpi2dng");
 
-  stat(inFile, &st);
-  gmtime_r(&st.st_mtime, &tm);
-  sprintf(datetime, "%04d:%02d:%02d %02d:%02d:%02d",
-	   tm.tm_year+1900,tm.tm_mon+1,tm.tm_mday,tm.tm_hour,tm.tm_min,tm.tm_sec);
-  TIFFSetField (tif, TIFFTAG_DATETIME, datetime);
 
   TIFFSetField (tif, TIFFTAG_SUBIFD, 1, &sub_offset);
   TIFFSetField (tif, TIFFTAG_DNGVERSION, "\001\001\0\0");
@@ -219,6 +219,27 @@ void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
   for (row=0; row < VPIXELS >> 4; row++)
     TIFFWriteScanline (tif, pixel, row, 0);
   TIFFWriteDirectory (tif);
+  */
+  //TIFFSetErrorHandler(errorhandler);
+
+  TIFFSetField (tif, TIFFTAG_MAKE, "Raspberry Pi");
+  TIFFSetField (tif, TIFFTAG_MODEL, "RP_OV5647");
+  TIFFSetField (tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+  TIFFSetField (tif, TIFFTAG_SOFTWARE, "rpi2dng");
+  TIFFSetField (tif, TIFFTAG_SUBIFD, 1, &sub_offset);
+  TIFFSetField (tif, TIFFTAG_DNGVERSION, "\001\001\0\0");
+  TIFFSetField (tif, TIFFTAG_DNGBACKWARDVERSION, "\001\0\0\0");
+  TIFFSetField (tif, TIFFTAG_UNIQUECAMERAMODEL, "Raspberry Pi - OV5647");
+  TIFFSetField (tif, TIFFTAG_COLORMATRIX1, 9, cam_xyz);
+  TIFFSetField (tif, TIFFTAG_ASSHOTNEUTRAL, 3, neutral);
+  TIFFSetField (tif, TIFFTAG_CALIBRATIONILLUMINANT1, 21);
+  TIFFSetField (tif, TIFFTAG_ORIGINALRAWFILENAME, inFile);
+  TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
+
+  stat(inFile, &st);
+  gmtime_r(&st.st_mtime, &tm);
+  sprintf(datetime, "%04d:%02d:%02d %02d:%02d:%02d", tm.tm_year+1900,tm.tm_mon+1,tm.tm_mday,tm.tm_hour,tm.tm_min,tm.tm_sec);
+  TIFFSetField (tif, TIFFTAG_DATETIME, datetime);
 
   TIFFSetField (tif, TIFFTAG_SUBFILETYPE, 0);
   TIFFSetField (tif, TIFFTAG_IMAGEWIDTH, HPIXELS);
@@ -231,6 +252,7 @@ void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
   TIFFSetField (tif, TIFFTAG_CFAPATTERN, 4, cfaPattern);
   //TIFFSetField (tif, TIFFTAG_LINEARIZATIONTABLE, 256, curve);
   TIFFSetField (tif, TIFFTAG_WHITELEVEL, 1, &white);
+  TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, 1); /* One row per stripe */
 
   fprintf(stderr, "\tcopying RAW data...\n");
   // for one file, (TotalFileLength:11112983 - RawBlockSize:6404096) + Header:32768 = 4741655
@@ -256,12 +278,13 @@ void processFile(char* inFile, char* outFile, char* matrix,int pattern) {
       pixel[col+2] += (split & 0b00001100)<<4;
       pixel[col+3] += (split & 0b00000011)<<6;
     }
-    if (TIFFWriteScanline (tif, pixel, row, 0) != 1) {
-      fprintf(stderr, "Error writing TIFF scanline.");
+    if (TIFFWriteEncodedStrip(tif, row, pixel, HPIXELS * 2) < 0) {
+      fprintf(stderr, "Error writing TIFF stripe at row %d.\n", row);
       goto fail;
     }
   }
 
+  TIFFWriteDirectory (tif);
   TIFFClose (tif);
 
  fail:
