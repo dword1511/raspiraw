@@ -1,2 +1,15 @@
-Contains a enhanced rpi2dng. This is a subset of https://github.com/bablokb/raspiraw .
-Needs libtiff5-dev, libjpeg-dev and libexif-dev to build. Does not need patched libTIFF anymore.
+Contains a enhanced `rpi2dng'. This is a subset of:
+  https://github.com/bablokb/raspiraw
+
+This enhanced version generates DNG files that work with `darktable', have the
+correct `AsShotNeutral' values, and do not contain the empty thumbnail. It will
+also copy EXIF tags, so you do not have to run `exiftool' separately. However,
+due to limitations in `libTIFF', rationals are expressed with large numerators
+and denominators, which will cause problems in some `exiv2'-based programs such
+as `UFRaw'. `tiffinfo' and `exiftool' can extract the information correctly.
+
+Black level is still missing. `darktable' may complain about missing camera
+white balance (for some color temperatures).
+
+Needs `libtiff5-dev', `libjpeg-dev' and `libexif-dev' to build. Does not need
+patched `libTIFF' anymore.
