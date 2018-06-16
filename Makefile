@@ -1,12 +1,10 @@
-CFLAGS = -Wall -g -O2
-LDLIBS = -ljpeg -lm -lz -lexif -ltiff
+CFLAGS = -Wall -g3 -gdwarf -O0
+#CFLAGS = -Wall -O2
+LDLIBS = -lexif -ltiff
 
-all: rpi2dng
-
-rpi2dng: rpi2dng.o
-	$(CC) $(LDFLAGS) rpi2dng.o $(LDLIBS) -o $@
+all: rpi2dng rpitrunc
 
 .PHONY: clean
 
 clean:
-	rm -rf *.o rpi2dng
+	rm -rf *.o rpi2dng rpitrunc
