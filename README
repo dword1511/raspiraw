@@ -2,17 +2,18 @@ Contains a enhanced `rpi2dng'. This is a subset of:
   https://github.com/bablokb/raspiraw
 
 This enhanced version generates DNG files that work with `darktable', have the
-correct `AsShotNeutral' values, and do not contain the empty thumbnail. It will
-also copy EXIF tags, so you do not have to run `exiftool' separately. However,
-due to limitations in `libTIFF', rationals are expressed with large numerators
-and denominators, which will cause problems in some `exiv2'-based programs such
-as `UFRaw' and `Gwenview'. `tiffinfo' and `exiftool' can extract the
-information correctly.
+correct `AsShotNeutral' values (while balance), and do not contain the empty
+thumbnail. It will also copy EXIF tags, so you do not have to run `exiftool'
+manually.
 
-Black level is still missing. `darktable' may complain about missing camera
-white balance (for some color temperatures). Currently assuming big-endian.
+However, due to limitations in `libTIFF', rationals are expressed with large
+numerators and denominators, which will cause problems in some programs.
+`tiffinfo' and `exiftool' can extract the information correctly.
 
-Needs `libtiff5-dev', `libjpeg-dev' and `libexif-dev' to build. Does not need
-patched `libTIFF' anymore.
+Requires `libtiff5-dev' and `libexif-dev' to build. Does not need patched
+`libTIFF' anymore.
 
-Also consider @schoolpost/pydng and @6by9/raspiraw.
+NOTE: for IMX219 there might be serious lens color shading. Use `darktable`'s
+color correction and mask system to get rid of it.
+
+See also schoolpost/pydng and 6by9/raspiraw.

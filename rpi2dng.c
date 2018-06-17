@@ -113,7 +113,7 @@ const raw_fmt_t fmt_imx219 = {
   .row_len      = 4128,     /* 16-pixel padding + other stuff, 28 bytes total */
   .raw_len      = 10270208,
 
-  .cfa_pattern  = RPI_RAW_CFA_PATT_NEW,
+  .cfa_pattern  = RPI_RAW_CFA_PATT_OLD,
   .black_lvl    = {60.0f, 60.0f, 60.0f, 60.0f},
   .model        = "RP_imx219",
 };
