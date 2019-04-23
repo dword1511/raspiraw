@@ -17,6 +17,11 @@
  *
  * TODO: this code needs some serious clean-up (esp. varible names!).
  * TODO: merge rpitrunc
+ * TODO: workaround libTIFF bug (use exiv instead?)
+ * TODO: allow override lens data
+ * TODO: allow using 3rd party color matrix (https://github.com/KillerInk/FreeDcam/blob/master/app/src/main/res/raw/matrixes.xml)
+ * TODO: allow override awb (use neutral)?
+ * TODO: process padded pixel for ABLC (also include in DNG)
  */
 
 
@@ -55,6 +60,9 @@
 #define RPI_RAW_CFA_PATT_NEW    {TIFF_CFA_G, TIFF_CFA_B, TIFF_CFA_R, TIFF_CFA_G}
 #define RPI_RAW_CFA_PATT_OLD    {TIFF_CFA_B, TIFF_CFA_G, TIFF_CFA_G, TIFF_CFA_R}
 
+#define BLC_OV5647              {16, 16, 16, 16}
+#define BLC_IMX219              {64, 64, 64, 64} /* Nearly universal on SONY CIS */
+
 #define DNG_SOFTWARE_ID         "rpi2dng @dword1511 fork"
 #define DNG_VER                 "\001\001\0\0"
 #define DNG_BACKWARD_VER        "\001\0\0\0"
@@ -81,7 +89,7 @@ const raw_fmt_t fmt_ov5647_old = {
   .raw_len      = 6404096,
 
   .cfa_pattern  = RPI_RAW_CFA_PATT_OLD,
-  .black_lvl    = {12.0f, 12.0f, 12.0f, 12.0f},
+  .black_lvl    = BLC_OV5647,
   .model        = "ov5647",
 };
 
@@ -92,7 +100,7 @@ const raw_fmt_t fmt_ov5647_new = {
   .raw_len      = 6404096,
 
   .cfa_pattern  = RPI_RAW_CFA_PATT_NEW,
-  .black_lvl    = {12.0f, 12.0f, 12.0f, 12.0f},
+  .black_lvl    = BLC_OV5647,
   .model        = "RP_ov5647",
 };
 
@@ -103,7 +111,7 @@ const raw_fmt_t fmt_ov5647_new2 = {
   .raw_len      = 6404096,
 
   .cfa_pattern  = RPI_RAW_CFA_PATT_NEW,
-  .black_lvl    = {12.0f, 12.0f, 12.0f, 12.0f},
+  .black_lvl    = BLC_OV5647,
   .model        = "RP_OV5647",
 };
 
@@ -114,7 +122,7 @@ const raw_fmt_t fmt_imx219 = {
   .raw_len      = 10270208,
 
   .cfa_pattern  = RPI_RAW_CFA_PATT_OLD,
-  .black_lvl    = {60.0f, 60.0f, 60.0f, 60.0f},
+  .black_lvl    = BLC_IMX219,
   .model        = "RP_imx219",
 };
 
@@ -261,23 +269,6 @@ static int copy_tags(const ExifData* edata, TIFF* tif, const char* matrix, const
       sscanf(strstr((const char *)eentry->data, "gain_r=") + 7, "%f", &gain[0]);
       sscanf(strstr((const char *)eentry->data, "gain_b=") + 7, "%f", &gain[2]);
 
-      /* This white balance stuff seems to work for IMX219, need more tests... */
-      /* May need to multiply w/ color matrix */
-      /*
-      sscanf(strstr((const char *)eentry->data, "greenness=") + 10, "%f", &gain[1]);
-      if (gain[1] < -80.0f) {
-        fprintf(stderr, "WARN: greenness in MakerNotes extremely small (%.0f), truncated.\n", gain[1]);
-        gain[1] = 0.2f;
-      }
-      gain[1] = 100.0f / (100.0f + gain[1]);
-
-      //gain[1] = 0.5f;
-
-      neutral[0] = gain[0];
-      neutral[1] = gain[1];
-      neutral[2] = gain[2];
-      */
-
       neutral[0] = (1 / gain[0]) / ((1 / gain[0]) + (1 / gain[1]) + (1 / gain[2]));
       neutral[1] = (1 / gain[1]) / ((1 / gain[0]) + (1 / gain[1]) + (1 / gain[2]));
       neutral[2] = (1 / gain[2]) / ((1 / gain[0]) + (1 / gain[1]) + (1 / gain[2]));
@@ -341,6 +332,7 @@ static int copy_tags(const ExifData* edata, TIFF* tif, const char* matrix, const
   TIFFSetDirectory(tif, 0);
 
   /* Copy EXIF information */
+  /* TODO: write a macro for these... */
   /* ExifIFD */
   if (EXIT_SUCCESS != TIFFCreateEXIFDirectory(tif)) {
     fprintf(stderr, "Failed to create EXIF directory!\n");
@@ -569,10 +561,10 @@ static void process_file(char* inFile, char* outFile, char* matrix, int pattern)
       /* Low-order packed bits from previous 4 pixels */
       split           = buffer[j ++];
       /* Unpack the bits, add to 16-bit values, left-justified */
-      pixel[col + 0] += (split & 0b11000000);
-      pixel[col + 1] += (split & 0b00110000) << 2;
-      pixel[col + 2] += (split & 0b00001100) << 4;
-      pixel[col + 3] += (split & 0b00000011) << 6;
+      pixel[col + 3] += (split & 0b11000000);
+      pixel[col + 2] += (split & 0b00110000) << 2;
+      pixel[col + 1] += (split & 0b00001100) << 4;
+      pixel[col + 0] += (split & 0b00000011) << 6;
 
       /* Right adjust them */
       pixel[col + 0] >>= (16 - RPI_RAW_BIT_DEPTH);
