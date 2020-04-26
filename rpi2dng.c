@@ -15,7 +15,7 @@
  * Thanks John Beale for RAW file samples.
  * Free for all uses.
  *
- * TODO: this code needs some serious clean-up (esp. varible names!).
+ * TODO: this code needs some serious clean-up (esp. varible names!)
  * TODO: merge rpitrunc
  * TODO: workaround libTIFF bug (use exiv instead?)
  * TODO: allow override lens data
@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -74,7 +75,7 @@ typedef struct {
   uint16_t  width;
   uint16_t  height;
   uint16_t  row_len;
-  size_t    raw_len;
+  uint64_t  raw_len;
 
   char      cfa_pattern[4];
   float     black_lvl[4];
@@ -168,16 +169,16 @@ static void read_matrix(float* matrix, const char* arg) {
   }
 }
 
-static float rational_to_float(void* p) {
+static double rational_to_float(void* p) {
   uint32_t* r;
   r = (uint32_t*)p;
-  return be32toh(r[0]) * 1.0f / be32toh(r[1]);
+  return be32toh(r[0]) * 1.0 / be32toh(r[1]);
 }
 
-static float srational_to_float(void* p) {
+static double srational_to_float(void* p) {
   int32_t* r;
   r = (int32_t*)p;
-  return be32toh(r[0]) * 1.0f / be32toh(r[1]);
+  return be32toh(r[0]) * 1.0 / be32toh(r[1]);
 }
 
 static void print_matrix(float matrix[9]) {
@@ -198,10 +199,9 @@ static int copy_tags(const ExifData* edata, TIFF* tif, const char* matrix, const
   struct tm*  tm        = NULL;
   time_t      rawtime;
   char        datetime[64];
-  uint16_t    iso;
   float       gain[]    = {1.0, 1.0, 1.0}; /* Default */
   float       neutral[3];
-  size_t      exif_dir_offset = 0;
+  uint64_t    exif_dir_offset = 0;
   //unsigned short curve[256];
   /* Default color matrix from dcraw */
   float cam_xyz[]  = {
@@ -348,7 +348,7 @@ static int copy_tags(const ExifData* edata, TIFF* tif, const char* matrix, const
     TIFFSetField(tif, EXIFTAG_EXPOSUREPROGRAM, be16toh(*((uint16_t *)eentry->data)));
   }
   if (NULL != (eentry = exif_content_get_entry(edata->ifd[EXIF_IFD_EXIF], EXIF_TAG_ISO_SPEED_RATINGS))) {
-    iso = be16toh(*((uint16_t *)eentry->data));
+    uint16_t iso = be16toh(*((uint16_t *)eentry->data));
     TIFFSetField(tif, EXIFTAG_ISOSPEEDRATINGS, 1, &iso);
   }
   /* Skipped: ExifVersion */
@@ -449,15 +449,15 @@ static const raw_fmt_t* get_format(ExifData* edata) {
   return *p_fmt;
 }
 
-static size_t get_data_offset(FILE* ifp, const raw_fmt_t* fmt) {
-  size_t  offset, len;
-  uint8_t buffer[16];
+static uint64_t get_data_offset(FILE* ifp, const raw_fmt_t* fmt) {
+  uint64_t  offset, len;
+  uint8_t   buffer[16];
 
   /* Check file length */
   fseek(ifp, 0, SEEK_END);
   len = ftell(ifp);
   if (len <= (fmt->raw_len + 1 + 2)) {
-    fprintf(stderr, "File too short to contain expected %zu-byte RAW data.\n", fmt->raw_len);
+    fprintf(stderr, "File too short to contain expected %" PRIu64 "-byte RAW data.\n", fmt->raw_len);
     return 0;
   }
 
@@ -465,7 +465,7 @@ static size_t get_data_offset(FILE* ifp, const raw_fmt_t* fmt) {
   fseek(ifp, offset - 2, SEEK_SET);
   fread(buffer, 16, 1, ifp);
   if ((buffer[0] != 0xff) || (buffer[1] != 0xd9)) {
-    fprintf(stderr, "JPEG EOI not found (want 0xffd9, got 0x%02x%02x, offset %zu).\n", buffer[0], buffer[1], offset);
+    fprintf(stderr, "JPEG EOI not found (want 0xffd9, got 0x%02x%02x, offset %" PRIu64 ").\n", buffer[0], buffer[1], offset);
     return 0;
   }
   if (0 != strncmp((const char*)(buffer + 2), RPI_RAW_MARKER, strlen(RPI_RAW_MARKER))) {
@@ -477,7 +477,7 @@ static size_t get_data_offset(FILE* ifp, const raw_fmt_t* fmt) {
 }
 
 static void process_file(char* inFile, char* outFile, char* matrix, int pattern) {
-  size_t            row, offset;
+  uint64_t          row, offset;
 
   char*             dngFile = NULL;
   unsigned char*    buffer  = NULL; /* Row buffer, packed */
@@ -511,7 +511,7 @@ static void process_file(char* inFile, char* outFile, char* matrix, int pattern)
     fprintf(stderr, "Cannot determine RAW data offset.\n");
     goto fail;
   }
-  fprintf(stderr, "Found RAW data @ offset %lu.\n", offset);
+  fprintf(stderr, "Found RAW data @ offset %" PRIu64 ".\n", offset);
   fseek(ifp, offset, SEEK_SET);
 
   /* Allocate memory for one line of pixel data */
@@ -574,7 +574,7 @@ static void process_file(char* inFile, char* outFile, char* matrix, int pattern)
     }
 
     if (TIFFWriteEncodedStrip(tif, row, pixel, fmt->width * 2) < 0) {
-      fprintf(stderr, "Error writing TIFF stripe at row %zu.\n", row);
+      fprintf(stderr, "Error writing TIFF stripe at row %" PRIu64 ".\n", row);
       goto fail;
     }
   }
